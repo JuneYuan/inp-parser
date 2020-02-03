@@ -17,18 +17,10 @@ const (
 	EndKeywordToken
 	// A CommentToken looks like '** xxx'.
 	CommentToken
-
-	// PartToken
-	// NodeToken
-	// ElementToken
-	// NsetToken
-	// ElsetToken
-	// OutputToken
-	// NodeOutputToken
 )
 
-// An Attribute is an attribute key-value triple.
-type Attribute struct {
+// An Parameter is an attribute key-value triple.
+type Parameter struct {
 	Key, Val string
 }
 
@@ -39,14 +31,14 @@ type Token struct {
 	Name       string
 	// Data is the data lines followed when TokenType=KeywordToken
 	Data       string
-	// Attr is potential parameters
-	Attr       []Attribute
+	// Param is potential parameters
+	Param      []Parameter
 }
 
 // paramString returns a string representation of a Keyword Token's params
 func (t Token) paramString() string {
 	s := ""
-	for _, p := range t.Attr {
+	for _, p := range t.Param {
 		s += fmt.Sprintf(", %v", p.Key)
 		if len(p.Val) > 0 {
 			s += fmt.Sprintf("=%v", p.Val)
@@ -63,7 +55,6 @@ func (t Token) String() string {
 	case CommentToken, EndKeywordToken:
 		return t.Data
 	case KeywordToken:
-		// *Nset, nset=Set-2_Vz, generate
 		return fmt.Sprintf("*%s%s\n%s", t.Name, t.paramString(), t.Data)
 	}
 	return "Invalid(" + strconv.Itoa(int(t.Type)) + ")"
@@ -331,8 +322,6 @@ loop:
 			return z.tt
 		}
 	}
-	// TODO
-	// corner case
 	z.tt = ErrorToken
 	return z.tt
 }
@@ -357,23 +346,15 @@ func (z *Tokenizer) Token() Token {
 				case 0:
 					continue
 				case 1:
-					t.Attr = append(t.Attr, Attribute{Key: kv[0]})
+					t.Param = append(t.Param, Parameter{Key: kv[0]})
 				case 2:
-					t.Attr = append(t.Attr, Attribute{Key: kv[0], Val: kv[1]})
+					t.Param = append(t.Param, Parameter{Key: kv[0], Val: kv[1]})
 				}
 			}
 		}
 	}
 
 	return t
-}
-
-
-func (z *Tokenizer) readKeyword() TokenType {
-
-	// TODO recognize self-closing token like "*End Part"
-
-	return KeywordToken
 }
 
 func NewTokenizer(r io.Reader) *Tokenizer {
