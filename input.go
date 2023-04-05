@@ -327,10 +327,8 @@ U1, U2, U3
 *End Step
 `
 
-const tmpInp = `** 
-** STEP: Step-1
-** 
-*Step, name=Step-1
+const tmpInp = `*Elset, elset=_PickedSet5, internal, generate
+     1,  64000,      1
 *Dynamic, Explicit, element by element
 , 8e-4
 *Bulk Viscosity

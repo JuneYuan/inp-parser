@@ -52,8 +52,10 @@ func (t Token) String() string {
 	switch t.Type {
 	case ErrorToken:
 		return ""
-	case CommentToken, EndKeywordToken:
+	case CommentToken:
 		return t.Data
+	case EndKeywordToken:
+		return fmt.Sprintf("*%s\n", t.Name)
 	case KeywordToken:
 		return fmt.Sprintf("*%s%s\n%s", t.Name, t.paramString(), t.Data)
 	}
@@ -175,13 +177,14 @@ func (z *Tokenizer) skipWhiteSpace() {
 	}
 }
 
-// readUntilNextOption reads until the next "*".
+// readUntilLineBreak reads until the next "*".
 // The leading two bytes ("**" or "*E") has been consumed.
 func (z *Tokenizer) readUntilLineBreak() {
 	z.data.start = z.raw.end - len("**")
 
 	if z.tt == EndKeywordToken {
 		z.readKeywordName()
+		return
 	}
 
 	for {
@@ -198,7 +201,7 @@ func (z *Tokenizer) readUntilLineBreak() {
 }
 
 // readKeywordWithData reads the next keyword line and its following data (if any).
-// The opening "*" has already been consumed.
+// The opening "*A" has already been consumed, where 'a' means anything in [A-Za-z].
 func (z *Tokenizer) readKeywordWithData() TokenType {
 	z.readKeywordName()
 	if z.skipWhiteSpace(); z.err != nil {
@@ -247,8 +250,9 @@ loop:
 	return KeywordToken
 }
 
-// readKeywordName sets z.data to, for example, the "Node" in "*Node", or the
-// "Rate Dependent" in "*Rate Dependent". The leading "*" has already been consumed.
+// readKeywordName sets z.name to, for example, the "Node" in "*Node", or the
+// "Rate Dependent" in "*Rate Dependent". The opening "*A" has already been
+// consumed, where 'a' means anything in [A-Za-z].
 func (z *Tokenizer) readKeywordName() {
 	z.name.start = z.raw.end - 1
 	for {
@@ -291,25 +295,27 @@ loop:
 
 		// check if the '*' we have just read is leading a keyword line
 		// if not ...
-		var tokenType = KeywordToken
+		var tokenType TokenType
 		c = z.readByte()
 		if z.err != nil {
 			break loop
 		}
 		switch c {
-		case '*':
+		case '*': // **
 			tokenType = CommentToken
-		case 'E', 'e':
+		case 'E', 'e': // *E, *e
 			c0 := z.readByte()
 			if z.err != nil { break loop }
 			c1 := z.readByte()
 			if z.err != nil { break loop }
 			if c0 == 'n' && c1 == 'd' {
 				tokenType = EndKeywordToken
-				z.raw.end -= len("nd")
 			} else {
-				z.raw.end -= len("End")
+				tokenType = KeywordToken
 			}
+			z.raw.end -= len("nd")
+		default:
+			tokenType = KeywordToken
 		}
 
 		switch tokenType {
@@ -317,8 +323,8 @@ loop:
 			z.tt = z.readKeywordWithData()
 			return z.tt
 		case CommentToken, EndKeywordToken:
-			z.readUntilLineBreak()
 			z.tt = tokenType
+			z.readUntilLineBreak()
 			return z.tt
 		}
 	}
@@ -342,6 +348,9 @@ func (z *Tokenizer) Token() Token {
 			sParams := string(z.buf[z.params.start:z.params.end])
 			for _, s := range strings.Split(sParams, ",") {
 				kv := strings.Split(s, "=")
+				for i, e := range kv {
+					kv[i] = strings.TrimSpace(e)
+				}
 				switch len(kv) {
 				case 0:
 					continue
